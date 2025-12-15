@@ -3,6 +3,7 @@ import librosa as lb
 import matplotlib.pyplot as plt
 from os import listdir
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import precision_score, recall_score
 from sklearn import svm
 #from sklearn import neighbors
 import pickle
@@ -57,13 +58,8 @@ def padSamples(samples, maxSize): #TODO: check performance
 
 
 def getMetrics(y_test, y_pred, label):
-    numTestLabel = len(y_test[y_test == label])
-    numPredLabel = len(y_pred[y_pred == label])
-    numLabel = len(y_test[y_test == y_pred])
-    numPredCorrectLabel = ((numTestLabel + numPredLabel + numLabel) - len(y_test)) / 2
-
-    precision = numPredCorrectLabel / numPredLabel
-    recall = numPredCorrectLabel / numTestLabel
+    precision = precision_score(y_test, y_pred, pos_label=label)
+    recall = recall_score(y_test, y_pred, pos_label=label)
     return precision, recall
 
 
