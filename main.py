@@ -18,14 +18,10 @@ SEED = 41
 
 def readSamples(path):
     """
-    # TODO: fix docstring
     Read audio samples from the given path.
 
-    Parameters:
-    path (str): Path to the audio file.
-
-    Returns:
-    tuple: Audio power spectrograms and sampling rate.
+    :param path: Path to the audio file folder.
+    :return: Audio power spectrograms.
     """
     audios = []
     maxSize = 0
@@ -41,23 +37,38 @@ def readSamples(path):
         # In case the SR is different from expected, resample
         if sr > SAMPLING_RATE:
             audio = lb.resample(audio, orig_sr=sr, target_sr=SAMPLING_RATE)
-            sr = SAMPLING_RATE
 
-        spectogram = np.abs(lb.stft(audio, dtype=np.float32)).T  # n_fft=2048, hop_length=512 #TODO: check dtype
+        spectrogram = np.abs(lb.stft(audio, dtype=np.float32)).T  # n_fft=2048, hop_length=512 #TODO: check dtype
 
-        if spectogram.shape[0] > maxSize:
-            maxSize = spectogram.shape[0]
+        # Get the maximum size of the spectrogram among the samples
+        if spectrogram.shape[0] > maxSize:
+            maxSize = spectrogram.shape[0]
 
-        audios.append((spectogram ** 2, sr)) # TODO: remove sr when not needed
+        audios.append(spectrogram ** 2)
     return audios, maxSize
 
 
-def padSamples(samples, maxSize): #TODO: check performance
-    samples = [np.pad(sample[0], ((0, maxSize - sample[0].shape[0]), (0, 0)), 'constant') for sample in samples]
+def padSamples(samples, maxSize):
+    """
+    Pads the samples with zeroes so they all have the same shape
+
+    :param samples: Samples to pad with zeroes
+    :param maxSize: Maximum size of a given samples
+    :return: Numpy array of padded samples with shape (maxSize, sample.shape[1])
+    """
+    samples = [np.pad(sample, ((0, maxSize - sample.shape[0]), (0, 0)), 'constant') for sample in samples]
     return np.array(samples)
 
 
 def getMetrics(y_test, y_pred, label):
+    """
+    Returns the precision and recall score for the label
+
+    :param y_test: Test labels/ground truth
+    :param y_pred: Predicted labels
+    :param label: The label to calculate metrics for
+    :return: Precision and recall score of the label
+    """
     precision = precision_score(y_test, y_pred, pos_label=label)
     recall = recall_score(y_test, y_pred, pos_label=label)
     return precision, recall
