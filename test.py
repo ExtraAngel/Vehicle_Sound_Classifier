@@ -38,9 +38,8 @@ def main():
     _, X_test, _, y_test = train_test_split(samples, labels, test_size=TEST_RATE, random_state=SEED)
 
     predictions = model.predict(X_test)
-    accuracy = np.mean(predictions == y_test)
-    carPrecision, carRecall = getMetrics(y_test, predictions, 0)
-    tramPrecision, tramRecall = getMetrics(y_test, predictions, 1)
+    carPrecision, carRecall, accuracy = getMetrics(y_test, predictions, 0)
+    tramPrecision, tramRecall, accuracy = getMetrics(y_test, predictions, 1)
 
     # Display the results:
     print(f"Model accuracy: {accuracy * 100:.2f}%")
