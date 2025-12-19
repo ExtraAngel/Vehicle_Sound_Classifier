@@ -51,6 +51,7 @@ def readSamples(path, audio_feature=AUDIO_FEATURE):
         else:
             raise Exception("Please enter a valid audio feature \"mfcc\", \"rms\", \"zcr\" or \"cqt\".")
 
+        maxSize = max(maxSize, feat.shape[1])
         audios.append(feat)
     return audios, maxSize
 
