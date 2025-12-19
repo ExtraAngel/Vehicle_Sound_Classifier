@@ -9,14 +9,14 @@ from sklearn import svm
 import pickle
 
 
-# CONSTANTS
+# CONSTANTS:
+AUDIO_FEATURE = "mfcc"
 SAMPLING_RATE = 48000
-#TRAIN_RATE = 0.8
 TEST_RATE = 0.2
 SEED = 41
 
 
-def readSamples(path, audio_feature="mfcc"):
+def readSamples(path, audio_feature=AUDIO_FEATURE):
     """
     Read audio samples from the given path.
 
@@ -85,30 +85,39 @@ def getMetrics(y_test, y_pred, label):
     return precision, recall, accuracy
 
 
-def main():
-    audio_feature = "mfcc"
-    # Load tram audio features and their respective sampling rates:
-    tramSamples, maxTramSize = readSamples("Samples/Tram/", audio_feature)
-    print(f"Loaded {len(tramSamples)} tram samples.")
-
-    # Load car audio features and their respective sampling rates:
-    carSamples, maxCarSize = readSamples("Samples/Car/", audio_feature)
-    print(f"Loaded {len(carSamples)} car samples.")
-
-    maxSize = max(maxTramSize, maxCarSize)
-
-    tramSamples = padSamples(tramSamples, maxSize)
-    carSamples = padSamples(carSamples, maxSize)
+def formatInputData(tramSamples, carSamples, maxSize):
+    # Pad the samples to be the same shape:
+    X_tram = padSamples(tramSamples, maxSize)
+    X_car = padSamples(carSamples, maxSize)
     print(f"Padded samples to size: {maxSize}")
 
-    # # Combine the samples into a single array:
-    samples = np.concat((tramSamples, carSamples), axis=0, dtype=np.float32)
-    samples = samples.reshape(samples.shape[0], -1)
-    print(f"Shape of samples: {samples.shape}")
+    # Combine the samples into a single array:
+    X = np.concat((X_tram, X_car), axis=0, dtype=np.float32)
+    X = X.reshape(X.shape[0], -1)
+    print(f"Shape of samples: {X.shape}")
 
-    labels = np.concat((np.ones(len(tramSamples)), np.zeros(len(carSamples))), axis=0, dtype=np.float32)
+    # Create the labels
+    y = np.concat((np.ones(len(tramSamples)), np.zeros(len(carSamples))), axis=0, dtype=np.float32)
 
-    X_train, X_test, y_train, y_test = train_test_split(samples, labels, test_size=TEST_RATE, random_state=SEED)
+    return X, y
+
+
+def main():
+    # Load tram audio clips and their maximum sample size:
+    tramTrainSamples, maxTramTrainSize = readSamples("Samples/Tram/Train/")
+    tramTestSamples, maxTramTestSize = readSamples("Samples/Tram/Test/")
+    print(f"Loaded {len(tramTrainSamples)} tram samples.")
+
+    # Load car audio clips and their maximum sample size
+    carTrainSamples, maxCarTrainSize = readSamples("Samples/Car/Train/")
+    carTestSamples, maxCarTestSize = readSamples("Samples/Car/Test/")
+    print(f"Loaded {len(carTrainSamples)} car samples.")
+
+    maxSize = max(maxTramTrainSize, maxCarTrainSize, maxTramTestSize, maxCarTestSize)
+
+    X_train, y_train = formatInputData(tramTrainSamples, carTrainSamples, maxSize)
+    X_test, y_test = formatInputData(tramTestSamples, carTestSamples, maxSize)
+
     print(f"Training set size: {X_train.shape[0]} samples.")
     print(f"Testing set size: {X_test.shape[0]} samples.")
 
