@@ -7,20 +7,21 @@ from sklearn.metrics import precision_score, recall_score
 from sklearn.model_selection import train_test_split
 from main import getMetrics, padSamples, readSamples, SEED, TEST_RATE
 
+
 def main():
     # Load the model:
-    with open("linear_svc_model.pkl", "rb") as f:
+    with open("mfcc.pkl", "rb") as f:
         model = pickle.load(f)
 
     # Load tram audio spectrogram's and their respective sampling rates:
-    tramSamples, maxTramSize = readSamples("Samples/Tram/")
+    tramSamples, maxTramSize = readSamples("Samples/Tram/Train/")
     print(f"Loaded {len(tramSamples)} tram samples.")
 
     # Load car audio spectrogram's and their respective sampling rates:
-    carSamples, maxCarSize = readSamples("Samples/Car/")
+    carSamples, maxCarSize = readSamples("Samples/Car/Train/")
     print(f"Loaded {len(carSamples)} car samples.")
 
-    maxSize = max(maxTramSize, maxCarSize)
+    maxSize = 615 #TODO: max(maxTramSize, maxCarSize)
 
     # Pad the samples to have the same size:
     tramSamples = padSamples(tramSamples, maxSize)
@@ -35,7 +36,8 @@ def main():
     # Add labels to the samples:
     labels = np.concat((np.ones(len(tramSamples)), np.zeros(len(carSamples))), axis=0, dtype=np.float32)
 
-    _, X_test, _, y_test = train_test_split(samples, labels, test_size=TEST_RATE, random_state=SEED)
+    _, X_test, _, y_test = train_test_split(samples, labels, test_size=0.99, random_state=SEED)
+    print(f"Testing set size: {X_test.shape[0]} samples.")
 
     predictions = model.predict(X_test)
     carPrecision, carRecall, accuracy = getMetrics(y_test, predictions, 0)

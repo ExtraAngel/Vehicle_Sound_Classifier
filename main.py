@@ -1,9 +1,6 @@
 import numpy as np
 import librosa as lb
-from librosa import feature
-import matplotlib.pyplot as plt
 from os import listdir
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import precision_score, recall_score
 from sklearn import svm
 import pickle
@@ -11,11 +8,13 @@ import pickle
 
 # CONSTANTS:
 AUDIO_FEATURE = "mfcc"
+FILE_NAME = "mfcc.pkl"
 SAMPLING_RATE = 48000
-TEST_RATE = 0.2
+TEST_RATE = 0.5
 SEED = 41
 
 
+# TODO: rename func
 def readSamples(path, audio_feature=AUDIO_FEATURE):
     """
     Read audio samples from the given path.
@@ -42,17 +41,15 @@ def readSamples(path, audio_feature=AUDIO_FEATURE):
 
         # Load the given audio feature
         if audio_feature == "mfcc":
-            feat = feature.mfcc(y=audio, sr=sr)
+            feat = lb.feature.mfcc(y=audio, sr=sr, n_mfcc=8)
         elif audio_feature == "rms":
-            feat = feature.rms(y=audio)
+            feat = lb.feature.rms(y=audio)
         elif audio_feature == "zcr":
-            feat = feature.zero_crossing_rate(y=audio)
+            feat = lb.feature.zero_crossing_rate(y=audio)
         elif audio_feature == "cqt":
-            feat = feature.chroma_cqt(y=audio, sr=sr)
+            feat = lb.feature.chroma_cqt(y=audio, sr=sr)
         else:
             raise Exception("Please enter a valid audio feature \"mfcc\", \"rms\", \"zcr\" or \"cqt\".")
-
-        maxSize = max(maxSize, feat.shape[1])
 
         audios.append(feat)
     return audios, maxSize
@@ -106,15 +103,16 @@ def main():
     # Load tram audio clips and their maximum sample size:
     tramTrainSamples, maxTramTrainSize = readSamples("Samples/Tram/Train/")
     tramTestSamples, maxTramTestSize = readSamples("Samples/Tram/Test/")
-    print(f"Loaded {len(tramTrainSamples)} tram samples.")
+    print(f"Loaded {len(tramTrainSamples) + len(tramTestSamples)} tram samples.")
 
     # Load car audio clips and their maximum sample size
     carTrainSamples, maxCarTrainSize = readSamples("Samples/Car/Train/")
     carTestSamples, maxCarTestSize = readSamples("Samples/Car/Test/")
-    print(f"Loaded {len(carTrainSamples)} car samples.")
+    print(f"Loaded {len(carTrainSamples) + len(carTestSamples)} car samples.")
 
     maxSize = max(maxTramTrainSize, maxCarTrainSize, maxTramTestSize, maxCarTestSize)
 
+    # Get the train and test data from samples in correct format:
     X_train, y_train = formatInputData(tramTrainSamples, carTrainSamples, maxSize)
     X_test, y_test = formatInputData(tramTestSamples, carTestSamples, maxSize)
 
@@ -128,9 +126,9 @@ def main():
     print("Model trained.")
 
     # Save the model to a file
-    with open('mfcc.pkl', 'wb') as model_file:
+    with open(FILE_NAME, 'wb') as model_file:
         pickle.dump(model, model_file)
-    print("Model saved to 'svm_model.pkl'.")
+    print(f"Model saved to '{FILE_NAME}'.")
 
     # Evaluate the model:
     predictions = model.predict(X_test)
