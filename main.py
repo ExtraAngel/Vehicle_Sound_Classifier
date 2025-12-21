@@ -8,7 +8,7 @@ import pickle
 
 # CONSTANTS:
 AUDIO_FEATURE = "mfcc"
-FILE_NAME = "mfcc.pkl"
+FILE_NAME = "comboModel.pkl"
 SAMPLING_RATE = 48000
 TEST_RATE = 0.5
 SEED = 41
@@ -41,7 +41,7 @@ def readSamples(path, audio_feature=AUDIO_FEATURE):
 
         # Load the given audio feature
         if audio_feature == "mfcc":
-            feat = lb.feature.mfcc(y=audio, sr=sr, n_mfcc=8)
+            feat = lb.feature.mfcc(y=audio, sr=sr, n_mfcc=6)
         elif audio_feature == "rms":
             feat = lb.feature.rms(y=audio)
         elif audio_feature == "zcr":
@@ -51,7 +51,16 @@ def readSamples(path, audio_feature=AUDIO_FEATURE):
         else:
             raise Exception("Please enter a valid audio feature \"mfcc\", \"rms\", \"zcr\" or \"cqt\".")
 
-        maxSize = max(maxSize, feat.shape[1])
+        mfcc_mean = np.mean(feat, axis=1)
+        centroid = lb.feature.spectral_centroid(y=audio, sr=sr).mean()
+        #bandwidth = lb.feature.spectral_bandwidth(y=audio, sr=sr).mean()
+        #zcr = lb.feature.zero_crossing_rate(audio).mean()
+        #rms = lb.feature.rms(y=audio).mean()
+
+        feat = np.hstack([mfcc_mean, [centroid]])
+        #feat = np.hstack([mfcc_mean, [centroid, bandwidth, zcr, rms]])
+
+        #maxSize = max(maxSize, feat.shape[1])
         audios.append(feat)
     return audios, maxSize
 
@@ -111,14 +120,20 @@ def main():
     carTestSamples, maxCarTestSize = readSamples("Samples/Car/Test/")
     print(f"Loaded {len(carTrainSamples) + len(carTestSamples)} car samples.")
 
-    maxSize = max(maxTramTrainSize, maxCarTrainSize, maxTramTestSize, maxCarTestSize)
+    X_train = np.concat((tramTrainSamples, carTrainSamples), axis=0, dtype=np.float32)
+    y_train = np.concat((np.ones(len(tramTrainSamples)), np.zeros(len(carTrainSamples))), axis=0, dtype=np.float32)
 
-    # Get the train and test data from samples in correct format:
-    X_train, y_train = formatInputData(tramTrainSamples, carTrainSamples, maxSize)
-    X_test, y_test = formatInputData(tramTestSamples, carTestSamples, maxSize)
+    X_test = np.concat((tramTestSamples, carTestSamples), axis=0, dtype=np.float32)
+    y_test = np.concat((np.ones(len(tramTestSamples)), np.zeros(len(carTestSamples))), axis=0, dtype=np.float32)
 
-    print(f"Training set size: {X_train.shape[0]} samples.")
-    print(f"Testing set size: {X_test.shape[0]} samples.")
+    # maxSize = max(maxTramTrainSize, maxCarTrainSize, maxTramTestSize, maxCarTestSize)
+
+    # # Get the train and test data from samples in correct format:
+    # X_train, y_train = formatInputData(tramTrainSamples, carTrainSamples, maxSize)
+    # X_test, y_test = formatInputData(tramTestSamples, carTestSamples, maxSize)
+    #
+    # print(f"Training set size: {X_train.shape[0]} samples.")
+    # print(f"Testing set size: {X_test.shape[0]} samples.")
 
     # Train the SVM model:
     model = svm.SVC(C=1, kernel='linear', random_state=SEED)
