@@ -12,6 +12,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 # CONSTANTS:
 AUDIO_FEATURES = "mfcc"
+KERNEL = "rbf"
 FILE_NAME = "comboModel.pkl"
 SAMPLING_RATE = 48000
 TEST_RATE = 0.5
@@ -100,7 +101,7 @@ def main():
     logging.info(f"Testing set size: {X_test.shape[0]} samples, with each sample being size {X_test.shape[1]}.")
 
     # Train the SVM model:
-    model = svm.SVC(C=1, kernel='linear', random_state=SEED)
+    model = svm.SVC(C=1, kernel=KERNEL, random_state=SEED)
     logging.info(f"Model starting training...")
     model.fit(X_train, y_train)
     logging.info("Model trained.")
