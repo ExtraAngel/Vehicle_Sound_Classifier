@@ -2,6 +2,7 @@ import numpy as np
 import librosa as lb
 from os import listdir
 from sklearn.metrics import precision_score, recall_score
+# from sklearn.model_selection import train_test_split
 from sklearn import svm
 import pickle
 import logging
@@ -11,36 +12,39 @@ import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
 # CONSTANTS:
-AUDIO_FEATURES = "mfcc"
+AUDIO_FEATURES = ["mfcc", "spectral", "rms", "zcr"]
 KERNEL = "rbf"
+N_MFCC = 6
+N_FFT = 256
 FILE_NAME = "comboModel.pkl"
-SAMPLING_RATE = 48000
 TEST_RATE = 0.5
 SEED = 41
 
 
-def getFeatures(path, audio_features=AUDIO_FEATURES): #TODO update docstring
+def getFeatures(path, audio_features=AUDIO_FEATURES):
     """
-    Read audio samples from the given path.
+    Returns the features of the sounds found in path.
+    The features are calculated, and their means will
+    be added to the output for a more consistent shape
 
-    :param path: Path to the audio file folder.
-    :param audio_features: The audio feature to use on the samples.
+    :param path: str, Path to the audio file folder.
+    :param audio_features: arr[str], The audio feature to use on the samples.
                           Options: "mfcc"(default), "zcr", "rms", "cqt"
     :return: Audio samples with their given features
     """
     audios = []
 
     for file in listdir(path):
-        audio, sr = lb.load(path + file, sr=None) #TODO: audioread
+        audio, sr = lb.load(path + file, sr=None)
 
         # Get the given audio features:
         feats = np.array([])
         if "mfcc" in audio_features:
-            mfcc_mean = np.mean(lb.feature.mfcc(y=audio, sr=sr, n_mfcc=4), axis=1)
+            mfcc_mean = np.mean(lb.feature.mfcc(y=audio, sr=sr, n_mfcc=N_MFCC), axis=1)
             feats = np.hstack([feats, mfcc_mean])
 
         if "cqt"  in audio_features:
-            cqt = lb.feature.chroma_cqt(y=audio, sr=sr)
+            cqt = lb.feature.chroma_cqt(y=audio, sr=sr).mean()
             feats = np.hstack([feats, cqt])
 
         if "rms" in audio_features:
@@ -55,6 +59,11 @@ def getFeatures(path, audio_features=AUDIO_FEATURES): #TODO update docstring
             centroid = lb.feature.spectral_centroid(y=audio, sr=sr).mean()
             bandwidth = lb.feature.spectral_bandwidth(y=audio, sr=sr).mean()
             feats = np.hstack([feats, [centroid, bandwidth]])
+
+        if "power"  in audio_features:
+            power = np.mean(np.abs(lb.stft(y=audio, n_fft=N_FFT)) ** 2, axis=1)
+            feats = np.hstack([feats, power])
+
 
         if feats.size == 0:
             raise Exception("Please enter a at least one valid audio feature "
@@ -96,6 +105,11 @@ def main():
 
     X_test = np.concat((tramTestSamples, carTestSamples), axis=0, dtype=np.float32)
     y_test = np.concat((np.ones(len(tramTestSamples)), np.zeros(len(carTestSamples))), axis=0, dtype=np.float32)
+
+    # Testing on all the data samples, not just only our recordings
+    # X = np.concat((X_train, X_test), axis=0)
+    # y = np.concat((y_train, y_test), axis=0)
+    # X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=TEST_RATE, random_state=SEED)
 
     logging.info(f"Training set size: {X_train.shape[0]} samples, with each sample being size {X_train.shape[1]}.")
     logging.info(f"Testing set size: {X_test.shape[0]} samples, with each sample being size {X_test.shape[1]}.")
