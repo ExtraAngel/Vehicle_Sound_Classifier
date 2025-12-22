@@ -6,6 +6,9 @@ from sklearn.model_selection import train_test_split
 from sklearn import svm
 import pickle
 import logging
+import matplotlib.pyplot as plt
+from matplotlib.patches import Patch
+from matplotlib.colors import ListedColormap
 
 
 # Configure logging
@@ -70,7 +73,7 @@ def getFeatures(path, audio_features=AUDIO_FEATURES):
                             "\"mfcc\", \"cqt\", \"rms\", \"zcr\" or \"spectral\".")
 
         audios.append(feats)
-    return audios
+    return np.array(audios)
 
 
 def getMetrics(y_test, y_pred, label):
@@ -88,7 +91,77 @@ def getMetrics(y_test, y_pred, label):
     return precision, recall, accuracy
 
 
+def plotModels():
+    """
+    Plots the model for different kernels when the X_train
+    has 2 features. The default use case is with the
+    "spectral" feature, as it only has 2 features.
+    """
+    tramTrainSamples = getFeatures("Samples/Tram/Train/", ["spectral"])
+    carTrainSamples = getFeatures("Samples/Car/Train/", ["spectral"])
+    logging.info("Read the audio features")
+
+    # For only selecting a small portion of the data points to plot
+    tramTrainSamples = tramTrainSamples[:200,:]
+    carTrainSamples = carTrainSamples[:200,:]
+
+    X_train = np.concat((tramTrainSamples, carTrainSamples), axis=0, dtype=np.float32)
+    y_train = np.concat((np.ones(len(tramTrainSamples)), np.zeros(len(carTrainSamples))), axis=0, dtype=np.float32)
+
+    kernels = ["linear", "rbf", "poly", "sigmoid"]
+    cmap = ListedColormap(["tab:olive", "tab:purple"])
+
+    for i in range(len(kernels)):
+        logging.info(f"Plotting model with kernel {kernels[i]}")
+
+        plt.subplot(2, 2, i + 1)  # can be done more dynamically
+
+        model = svm.SVC(C=1, kernel=kernels[i], random_state=SEED)
+        model.fit(X_train, y_train)
+
+        h = 10  # step size
+
+        # Create a mesh grid
+        x_min, x_max = X_train[:, 0].min() - 1, X_train[:, 0].max() + 1
+        y_min, y_max = X_train[:, 1].min() - 1, X_train[:, 1].max() + 1
+        xx, yy = np.meshgrid(
+            np.arange(x_min, x_max, h),
+            np.arange(y_min, y_max, h)
+        )
+
+        # Predict the values on the mesh grid
+        Z = model.predict(np.c_[xx.ravel(), yy.ravel()])
+        Z = Z.reshape(xx.shape)
+
+        # Decision regions
+        plt.contourf(xx, yy, Z, alpha=0.3, cmap=cmap)
+
+        # The data points of x_train
+        plt.scatter(X_train[:, 0], X_train[:, 1], c=y_train, cmap=cmap, edgecolors="k")
+
+        # Configuring the legend
+        legend_elements = [
+            Patch(facecolor=cmap(0), label="car"),
+            Patch(facecolor=cmap(1), label="tram"),
+        ]
+        plt.legend(handles=legend_elements)
+
+        # The labels are for spectral features, can be
+        # changed however so desired
+        plt.xlabel("Spectral centroid")
+        plt.ylabel("Spectral bandwidth")
+        plt.title(f"SVC with {kernels[i]} kernel")
+
+    plt.tight_layout()
+    plt.show()
+
+
 def trainAndTest():
+    """
+    Load the audio clips, get their desired features,
+    train the data and test the data. The model is an
+    SVC. The model will be saved in the FILE_NAME.
+    """
     # Load tram audio clips and their maximum sample size:
     tramTrainSamples = getFeatures("Samples/Tram/Train/")
     tramTestSamples = getFeatures("Samples/Tram/Test/")
@@ -139,10 +212,24 @@ def trainAndTest():
 
 
 def testOnly(Use50TestRate = False):
+    """
+    Only runs the testing data on the model. The model
+    should be present in FILE_NAME. If desired, the testing
+    can be done on a 50-50 split on the whole data.
+    :param Use50TestRate: bool, Whether the testing should be done
+                          on only the Test folders or the combined
+                          dataset with 50-50 split
+    """
     # Load the model:
-    with open(FILE_NAME, "rb") as f:
-        model = pickle.load(f)
-    logging.info(f"Model {FILE_NAME} loaded successfully.")
+    try:
+        f = open(FILE_NAME, "rb")
+    except FileNotFoundError:
+        logging.error(f"File '{FILE_NAME}' not found.")
+        return
+    else:
+        with f:
+            model = pickle.load(f)
+        logging.info(f"Model {FILE_NAME} loaded successfully.")
 
     if Use50TestRate:
         # Load tram audio spectrogram's and their respective sampling rates:
@@ -191,6 +278,7 @@ def testOnly(Use50TestRate = False):
 def main():
     # Uncomment the desired function to run:
     #trainAndTest()
+    #plotModels()
     testOnly()
 
 
