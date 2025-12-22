@@ -2,7 +2,7 @@ import numpy as np
 import librosa as lb
 from os import listdir
 from sklearn.metrics import precision_score, recall_score
-# from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split
 from sklearn import svm
 import pickle
 import logging
@@ -12,11 +12,11 @@ import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
 # CONSTANTS:
-AUDIO_FEATURES = ["mfcc", "spectral", "rms", "zcr"]
+AUDIO_FEATURES = ["mfcc"]
 KERNEL = "rbf"
-N_MFCC = 6
+N_MFCC = 4
 N_FFT = 256
-FILE_NAME = "comboModel.pkl"
+FILE_NAME = "model.pkl"
 TEST_RATE = 0.5
 SEED = 41
 
@@ -88,7 +88,7 @@ def getMetrics(y_test, y_pred, label):
     return precision, recall, accuracy
 
 
-def main():
+def trainAndTest():
     # Load tram audio clips and their maximum sample size:
     tramTrainSamples = getFeatures("Samples/Tram/Train/")
     tramTestSamples = getFeatures("Samples/Tram/Test/")
@@ -136,6 +136,62 @@ def main():
     logging.info(f"Model recall for car: {carRecall * 100:.2f}%")
     logging.info(f"Model precision for tram: {tramPrecision * 100:.2f}%")
     logging.info(f"Model recall for tram: {tramRecall * 100:.2f}%")
+
+
+def testOnly(Use50TestRate = False):
+    # Load the model:
+    with open(FILE_NAME, "rb") as f:
+        model = pickle.load(f)
+    logging.info(f"Model {FILE_NAME} loaded successfully.")
+
+    if Use50TestRate:
+        # Load tram audio spectrogram's and their respective sampling rates:
+        tramSamples = getFeatures("Samples/Tram/Train/")
+        logging.info(f"Loaded {len(tramSamples)} tram samples.")
+
+        # Load car audio spectrogram's and their respective sampling rates:
+        carSamples = getFeatures("Samples/Car/Train/")
+        logging.info(f"Loaded {len(carSamples)} car samples.")
+
+        # Combine the samples into a single array:
+        samples = np.concat((tramSamples, carSamples), axis=0, dtype=np.float32)
+        samples = samples.reshape(samples.shape[0], -1)
+
+        # Add labels to the samples:
+        labels = np.concat((np.ones(len(tramSamples)), np.zeros(len(carSamples))), axis=0, dtype=np.float32)
+
+        _, X_test, _, y_test = train_test_split(samples, labels, test_size=TEST_RATE, random_state=SEED)
+        logging.info(f"Testing set size: {X_test.shape[0]} samples.")
+
+    # Only test on our own recordings:
+    else:
+        # Load the features:
+        tramSamples = getFeatures("Samples/Tram/Test/")
+        logging.info(f"Loaded {len(tramSamples)} tram samples.")
+
+        carSamples = getFeatures("Samples/Car/Test/")
+        logging.info(f"Loaded {len(carSamples)} car samples.")
+
+        # Reshape them into test set:
+        X_test = np.concat((tramSamples, carSamples), axis=0, dtype=np.float32)
+        y_test = np.concat((np.ones(len(tramSamples)), np.zeros(len(carSamples))), axis=0, dtype=np.float32)
+
+    predictions = model.predict(X_test)
+    carPrecision, carRecall, accuracy = getMetrics(y_test, predictions, 0)
+    tramPrecision, tramRecall, accuracy = getMetrics(y_test, predictions, 1)
+
+    # Display the results:
+    logging.info(f"Model accuracy: {accuracy * 100:.2f}%")
+    logging.info(f"Model precision for car: {carPrecision * 100:.2f}%")
+    logging.info(f"Model recall for car: {carRecall * 100:.2f}%")
+    logging.info(f"Model precision for tram: {tramPrecision * 100:.2f}%")
+    logging.info(f"Model recall for tram: {tramRecall * 100:.2f}%")
+
+
+def main():
+    # Uncomment the desired function to run:
+    #trainAndTest()
+    testOnly()
 
 
 if __name__ == "__main__":
