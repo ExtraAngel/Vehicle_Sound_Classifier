@@ -6,14 +6,20 @@ from os import listdir
 import librosa as lb
 import matplotlib.pyplot as plt
 import numpy as np
+import typer
 from matplotlib.colors import ListedColormap
 from matplotlib.patches import Patch
 from sklearn import svm
 from sklearn.metrics import precision_score, recall_score
 from sklearn.model_selection import train_test_split
 
+from validation import are_samples_valid
+
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+app = typer.Typer()
+
+# todo: use pathlib.Path?
 
 # Data models:
 class AudioFeature(StrEnum):
@@ -285,12 +291,23 @@ def testOnly(Use50TestRate = False):
     logging.info(f"Model recall for tram: {tramRecall * 100:.2f}%")
 
 
-def main():
-    # Uncomment the desired function to run:
-    #trainAndTest()
-    #plotModels()
+@app.command()
+def train_test():
+    trainAndTest()
+
+@app.command()
+def test_only():
     testOnly()
+
+@app.command()
+def plot_models():
+    plotModels()
+
+@app.command()
+def validate_samples():
+    for path in ("Samples/Tram/Train/", "Samples/Tram/Test/", "Samples/Car/Train/", "Samples/Car/Test/"):
+        are_samples_valid(path)
 
 
 if __name__ == "__main__":
-    main()
+    app()
