@@ -1,21 +1,37 @@
-import numpy as np
-import librosa as lb
+import logging
+import pickle
+from enum import StrEnum
 from os import listdir
+
+import librosa as lb
+import matplotlib.pyplot as plt
+import numpy as np
+import typer
+from matplotlib.colors import ListedColormap
+from matplotlib.patches import Patch
+from sklearn import svm
 from sklearn.metrics import precision_score, recall_score
 from sklearn.model_selection import train_test_split
-from sklearn import svm
-import pickle
-import logging
-import matplotlib.pyplot as plt
-from matplotlib.patches import Patch
-from matplotlib.colors import ListedColormap
 
+from validation import are_samples_valid
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+app = typer.Typer()
+
+# todo: use pathlib.Path?
+
+# Data models:
+class AudioFeature(StrEnum):
+    MFCC = "mfcc"
+    CQT = "cqt"
+    RMS = "rms"
+    ZCR = "zcr"
+    SPECTRAL = "spectral"
+    POWER = "power"
 
 # CONSTANTS:
-AUDIO_FEATURES = ["mfcc"]
+AUDIO_FEATURES = [AudioFeature.MFCC]
 KERNEL = "rbf"
 N_MFCC = 4
 N_FFT = 256
@@ -24,7 +40,7 @@ TEST_RATE = 0.5
 SEED = 41
 
 
-def getFeatures(path, audio_features=AUDIO_FEATURES):
+def getFeatures(path, audio_features: list[AudioFeature] = AUDIO_FEATURES):
     """
     Returns the features of the sounds found in path.
     The features are calculated, and their means will
@@ -42,35 +58,35 @@ def getFeatures(path, audio_features=AUDIO_FEATURES):
 
         # Get the given audio features:
         feats = np.array([])
-        if "mfcc" in audio_features:
+        if AudioFeature.MFCC in audio_features:
             mfcc_mean = np.mean(lb.feature.mfcc(y=audio, sr=sr, n_mfcc=N_MFCC), axis=1)
             feats = np.hstack([feats, mfcc_mean])
 
-        if "cqt"  in audio_features:
+        if AudioFeature.CQT in audio_features:
             cqt = lb.feature.chroma_cqt(y=audio, sr=sr).mean()
             feats = np.hstack([feats, cqt])
 
-        if "rms" in audio_features:
+        if AudioFeature.RMS in audio_features:
             rms = lb.feature.rms(y=audio).mean()
             feats = np.hstack([feats, rms])
 
-        if "zcr"  in audio_features:
+        if AudioFeature.ZCR in audio_features:
             zcr = lb.feature.zero_crossing_rate(audio).mean()
             feats = np.hstack([feats, zcr])
 
-        if "spectral" in audio_features:
+        if AudioFeature.SPECTRAL in audio_features:
             centroid = lb.feature.spectral_centroid(y=audio, sr=sr).mean()
             bandwidth = lb.feature.spectral_bandwidth(y=audio, sr=sr).mean()
             feats = np.hstack([feats, [centroid, bandwidth]])
 
-        if "power"  in audio_features:
+        if AudioFeature.POWER in audio_features:
             power = np.mean(np.abs(lb.stft(y=audio, n_fft=N_FFT)) ** 2, axis=1)
             feats = np.hstack([feats, power])
 
 
         if feats.size == 0:
-            raise Exception("Please enter a at least one valid audio feature "
-                            "\"mfcc\", \"cqt\", \"rms\", \"zcr\" or \"spectral\".")
+            features = ", ".join(f.value for f in AudioFeature)
+            raise ValueError(f"Please enter a at least one valid audio feature: {features}")
 
         audios.append(feats)
     return np.array(audios)
@@ -275,12 +291,23 @@ def testOnly(Use50TestRate = False):
     logging.info(f"Model recall for tram: {tramRecall * 100:.2f}%")
 
 
-def main():
-    # Uncomment the desired function to run:
-    #trainAndTest()
-    #plotModels()
+@app.command()
+def train_test():
+    trainAndTest()
+
+@app.command()
+def test_only():
     testOnly()
+
+@app.command()
+def plot_models():
+    plotModels()
+
+@app.command()
+def validate_samples():
+    for path in ("Samples/Tram/Train/", "Samples/Tram/Test/", "Samples/Car/Train/", "Samples/Car/Test/"):
+        are_samples_valid(path)
 
 
 if __name__ == "__main__":
-    main()
+    app()
